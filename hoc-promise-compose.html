@@ -124,7 +124,11 @@
         })
       }
 
-      const composed = compose(withLog, withPromise(request))
+      // 组合函数 返回这样的函数： (wrapped) => withPromise(request)(withLog(wrapped))
+      const composed = compose(
+        withLog,
+        withPromise(request)
+      )
 
       var hoc = composed(view)
 
