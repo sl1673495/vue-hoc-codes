@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hoc-promise-easy</title>
+  </head>
+  <body>
+    <div id="app">
+      <hoc />
+    </div>
+    <script src="./vue.js"></script>
+    <script>
+      var view = {
+        props: ["result", "loading"],
+        template: `
+          <span>
+            <span>{{result?.name}}</span>
+          </span>
+        `,
+      };
+
+      const withPromise = (wrapped, promiseFn) => {
+        return {
+          data() {
+            return {
+              loading: false,
+              error: false,
+              result: null,
+            };
+          },
+          async mounted() {
+            this.loading = true;
+            const result = await promiseFn().finally(() => {
+              this.loading = false;
+            });
+            this.result = result;
+          },
+          render(h) {
+            const args = {
+              props: {
+                result: this.result,
+                loading: this.loading,
+              },
+            };
+
+            const wrapper = h("div", [
+              h(wrapped, args),
+              this.loading ? h("span", ["加载中……"]) : null,
+              this.error ? h("span", ["加载错误"]) : null,
+            ]);
+
+            return wrapper;
+          },
+        };
+      };
+
+      const request = (data) => {
+        return new Promise((r) => {
+          setTimeout(() => {
+            r({ name: "ssh" });
+          }, 1000);
+        });
+      };
+
+      var hoc = withPromise(view, request);
+
+      new Vue({
+        el: "#app",
+        components: {
+          hoc,
+        },
+      });
+    </script>
+  </body>
+</html>

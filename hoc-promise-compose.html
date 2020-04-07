@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hoc-promise</title>
+  </head>
+  <body>
+    <div id="app">
+      <hoc msg="msg" @change="onChange">
+        <template>
+          <div>I am slot</div>
+        </template>
+        <template v-slot:named>
+          <div>I am named slot</div>
+        </template>
+      </hoc>
+    </div>
+    <script src="./vue.js"></script>
+    <script>
+      var view = {
+        props: ["result"],
+        data() {
+          return {
+            requestParams: {
+              name: "ssh",
+            },
+          }
+        },
+        methods: {
+          reload() {
+            this.requestParams = {
+              name: "changed!!",
+            }
+          },
+        },
+        template: `
+          <span>
+            <span>{{result?.name}}</span>
+            <slot></slot>
+            <slot name="named"></slot>
+            <button @click="reload">重新加载数据</button>
+          </span>
+        `,
+      }
+
+      const withPromise = (promiseFn) => {
+        return function (wrapped) {
+          return {
+            data() {
+              return {
+                loading: false,
+                error: false,
+                result: null,
+              }
+            },
+            methods: {
+              async request() {
+                this.loading = true
+                // 从子组件实例里拿到数据
+                const { requestParams } = this.$refs.wrapped
+                // 传递给请求函数
+                const result = await promiseFn(requestParams).finally(() => {
+                  this.loading = false
+                })
+                this.result = result
+              },
+            },
+            async mounted() {
+              // 立刻发送请求，并且监听参数变化重新请求
+              this.$refs.wrapped.$watch(
+                "requestParams",
+                this.request.bind(this),
+                {
+                  immediate: true,
+                },
+              )
+            },
+            render(h) {
+              const args = {
+                props: {
+                  // 混入 $attrs
+                  ...this.$attrs,
+                  result: this.result,
+                  loading: this.loading,
+                },
+
+                // 传递事件
+                on: this.$listeners,
+
+                // 传递 $scopedSlots
+                scopedSlots: this.$scopedSlots,
+                ref: "wrapped",
+              }
+
+              const wrapper = h("div", [
+                this.loading ? h("span", ["加载中……"]) : null,
+                this.error ? h("span", ["加载错误"]) : null,
+                h(wrapped, args),
+              ])
+
+              return wrapper
+            },
+          }
+        }
+      }
+
+      const withLog = (wrapped) => {
+        return {
+          mounted() {
+            console.log("I am mounted!")
+          },
+          render(h) {
+            return h(wrapped, normalizeProps(this))
+          },
+        }
+      }
+
+      const request = (data) => {
+        return new Promise((r) => {
+          setTimeout(() => {
+            r(data)
+          }, 1000)
+        })
+      }
+
+      const composed = compose(withLog, withPromise(request))
+
+      var hoc = composed(view)
+
+      new Vue({
+        el: "#app",
+        components: {
+          hoc,
+        },
+        methods: {
+          onChange() {},
+        },
+      })
+
+      function compose(...funcs) {
+        return funcs.reduce((a, b) => (...args) => a(b(...args)))
+      }
+
+      function normalizeProps(vm) {
+        return {
+          on: vm.$listeners,
+          attr: vm.$attrs,
+          // 传递 $scopedSlots
+          scopedSlots: vm.$scopedSlots,
+        }
+      }
+    </script>
+  </body>
+</html>
